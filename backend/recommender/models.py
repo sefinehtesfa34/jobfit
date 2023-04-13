@@ -1,6 +1,7 @@
 import time
 from django.db import models
 import uuid
+from django.utils import timezone
 from datetime import date 
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
@@ -37,7 +38,7 @@ class CustomeUser(AbstractUser):
     resume = models.FileField(upload_to='./static/resumes', blank = True)
     residence = models.CharField(max_length = 100, blank = True)
     about = models.TextField(max_length = 1000, blank = True)
-    timestamp = models.DateField(default= date.today())
+    timestamp = models.DateField(default=timezone.now())
     role = models.CharField(max_length= 100, default='freelance')
     USERNAME_FIELD ='email'
     REQUIRED_FIELDS = ['password']
@@ -53,7 +54,7 @@ class Job(models.Model):
     preferredQualification = models.TextField(max_length = 500, blank = True)
     jobCategory = models.CharField(max_length = 100, blank=True)
     description = models.TextField(max_length = 10000, default = 'no description')
-    timestamp = models.DateField(default= date.today())
+    timestamp = models.DateField(default=timezone.now())
     
 class Skill(models.Model):
     skillId = models.UUIDField(max_length = 120, default = uuid.uuid4 ,primary_key = True)
@@ -65,6 +66,6 @@ class TalentProfile(models.Model):
     linkedin = models.CharField(max_length = 120, blank = True)
     certification = models.CharField(max_length= 1000, blank=True)
     skill = models.ForeignKey('Skill',on_delete=models.CASCADE)
-    timestamp = models.DateField(default= date.today())
+    timestamp = models.DateField(default=timezone.now())
 
     
