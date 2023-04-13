@@ -1,5 +1,6 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 import sqlite3
+from rest_framework import filters
 from rest_framework.views import APIView
 from django.db.models import Count
 from rest_framework.response import Response
@@ -229,38 +230,8 @@ class SkillDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated, )
     serializer_class = SkillSerializer
     queryset = Skill.objects.all()
-class Search(APIView, PageNumberPagination):
-    def get(self, request, format = None):
-        query = request.GET.get('query', '')
-        connection = sqlite3.Connection('db.sqlite3')
-        connect = connection.cursor()
-        connect.execute('''SELECT 
-                                jobId,
-                                user_id,
-                                jobTitle,
-                                responsibility,
-                                qualification,
-                                preferredQualification,
-                                jobCategory,
-                                description,
-                                timestamp
-                                FROM recommender_job WHERE jobTitle LIKE ?''', 
-                                ('%'+query+'%',))
-        data = []
-        results = connect.fetchmany(10)
-        columns = ["jobId", 
-                   "user_id",
-                   "jobTitle",
-                    "responsibility",
-                    "qualification",
-                    "preferredQualification",
-                    "jobCategory",
-                    "description",
-                    "timestamp"
-                    ]
-        for result in results:
-            data.append(dict(zip(columns, result)))
-        connection.commit()
-        connection.close()
-        
-        return Response(data)     
+class Search(generics.ListAPIView, PageNumberPagination):
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['jobTitle']     
