@@ -43,7 +43,9 @@ def respond(response):
     return data 
 class UserList(APIView, PageNumberPagination):
     def post(self, request, format = None):
-        request.data['is_active'] = True     
+        request.data._mutable = True 
+        request.data['is_active'] = True
+        request.data._mutable = False      
         serializer = UserSerializer(data = request.data)
         if serializer.is_valid():
             serializer.save()
