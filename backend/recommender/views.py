@@ -234,4 +234,8 @@ class Search(generics.ListAPIView, PageNumberPagination):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ['jobTitle']     
+    search_fields = ['description', 
+                     'qualification', 
+                     'responsibility', 
+                     'jobTitle', 
+                     'jobCategory']     
