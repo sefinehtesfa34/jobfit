@@ -43,9 +43,16 @@ class IsOwnerOrReadOnly(BasePermission):
      
 class UserList(APIView, PageNumberPagination):
     def post(self, request, format = None):
-        # request.data._mutable = True 
-        request.data['is_active'] = True
-        # request.data._mutable = False      
+        try:
+            request.data._mutable = True 
+            request.data['is_active'] = True
+            request.data._mutable = False      
+        except:
+            try:
+                request.data["is_active"] = True
+            except:
+                return Response({"message":"Invalid data", "statusCode":403})
+             
         serializer = UserSerializer(data = request.data)
         if serializer.is_valid():
             serializer.save()
