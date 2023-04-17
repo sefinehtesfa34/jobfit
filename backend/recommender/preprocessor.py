@@ -33,6 +33,7 @@ class Preprocessor:
             hashmap = pickle.load(file)
         vector_form = vectorizer.transform(self.cleaned_text)
         class_type = model.predict(vector_form)
+        print(hashmap)
         return hashmap[class_type[0]]
 def similarity(text1, text2):
     document = [text1, text2]
