@@ -1,5 +1,9 @@
+import datetime
+import jwt
+from rest_framework.permissions import BasePermission
+from jobRecommender import settings
 from rest_framework_simplejwt.authentication import JWTAuthentication
-import sqlite3
+from django.contrib.auth import authenticate
 from rest_framework import filters
 from rest_framework.views import APIView
 from django.db.models import Count
@@ -14,22 +18,9 @@ from .preprocessor import Preprocessor, similarity
 from PyPDF2 import PdfReader
 from rest_framework.pagination import PageNumberPagination
 import numpy as np 
-def verify_token(jobId, request):
-    try:
-        JWT_authenticator = JWTAuthentication()
-        response = JWT_authenticator.authenticate(request)
-        data, token = response 
-        job = Job.objects.get(jobId = jobId)
-        serializer = JobSerializer(job)
-        userId = serializer.data['userId']
-        if userId != token.payload.get('user_id', ''):
-            return {'error': 'You are not authorized', 'statusCode':status.HTTP_403_FORBIDDEN}, job 
-        return {'message':"Job has been successfully deleted", 'statusCode':200}, None 
-    except:
-        return {"error":"You are not authorized!", 'statusCode':403}, None 
+
         
-def respond(response):
-    
+def respond(response):    
     data = {"id":response['id'],
             'username':response['username'],
             'email':response['email'],
@@ -40,12 +31,21 @@ def respond(response):
             'role':response.get('role', ''),
             'about':response.get('about', '')
             }
-    return data 
+    return data
+class IsOwnerOrReadOnly(BasePermission):
+    '''
+    Custom class to only allow owner of the object edit it.
+    '''
+    def has_object_permission(self, request, view, obj):
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True 
+        return obj.user == request.user 
+     
 class UserList(APIView, PageNumberPagination):
     def post(self, request, format = None):
-        request.data._mutable = True 
+        # request.data._mutable = True 
         request.data['is_active'] = True
-        request.data._mutable = False      
+        # request.data._mutable = False      
         serializer = UserSerializer(data = request.data)
         if serializer.is_valid():
             serializer.save()
@@ -61,45 +61,14 @@ class UserList(APIView, PageNumberPagination):
         return self.get_paginated_response(data)
     
 class UserDetail(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
-    def get(self, request, userId, format = None):
-        JWT_authenticator = JWTAuthentication()
-        data, token = JWT_authenticator.authenticate(request)
-        user = CustomeUser.objects.get(pk = userId)
-        if user.id != token.payload.get('user_id', ''):
-            return Response({"error":"Access denied", 'status':status.HTTP_403_FORBIDDEN})
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-    
-    def delete(self, request, userId, format = None):
-        try:
-            JWT_authenticator = JWTAuthentication()
-            data, token = JWT_authenticator.authenticate(request)
-            user = CustomeUser.objects.get(pk = userId)
-            superuser = CustomeUser.objects.get(pk = token.payload.get('user_id', ''))
-            if superuser.is_superuser and user.id != token.payload.get('user_id', ''):
-                return Response({'error':'Access denied', 'statusCode':status.HTTP_403_FORBIDDEN})
-            user.delete()
-            return Response({"message":"Your account has been deleted", 'statusCode':200})
-        except:
-            return Response({'error':"Access denied", 'statusCode':403})
-    def put(self, request, userId, format = None):
-        try:
-            JWT_authenticator = JWTAuthentication()
-            data, token = JWT_authenticator.authenticate(request)
-            user = CustomeUser.objects.get(pk = userId)
-            request.data['is_active'] = True 
-            if user.id != token.payload.get('user_id', ''):
-                return Response({'error':'Access denied', 'statusCode':status.HTTP_403_FORBIDDEN})
-            serializer = UserSerializer(user, data = request.data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response({'error':'You can\'t update username or email.', 'statusCode':403})
-        
-        except:
-            return Response({'error':"Access denied" , 'statusCode':403})
-        
+    permission_classes = (permissions.IsAuthenticated
+                          ,IsOwnerOrReadOnly)
+    queryset = CustomeUser.objects.all()
+    serializer_class = UserSerializer 
+    lookup_field = 'id'
+    def put(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+       
 class JobList(APIView, PageNumberPagination):
     permission_classes = (permissions.IsAuthenticated,)
     def get(self, request, format = None):
@@ -120,33 +89,18 @@ class JobList(APIView, PageNumberPagination):
             serializer.save()
             return Response(serializer.data)
         return Response({"error":serializer.errors, "statusCode":status.HTTP_400_BAD_REQUEST})
+
     
-class JobDetail(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
-    def get(self, request, jobId, format = None):
-        try:
-            job = Job.objects.get(jobId = jobId)
-            serializer = JobSerializer(job)
-            return Response(serializer.data)
-        except:
-            return Response({'error':"Job not found", 'statusCode':status.HTTP_404_NOT_FOUND})
+class JobDetail(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticated
+                          ,IsOwnerOrReadOnly)
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer 
+    lookup_field = 'jobId'
+    def put(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+       
         
-    def delete(self, request, jobId, format = None):
-        response, job = verify_token(jobId, request)
-        if response['statusCode'] == 200:
-            job = Job.objects.get(jobId = jobId)
-            job.delete()
-            return Response(response)
-        response['statusCode'] = 403
-        return Response(response)
-            
-    def put(self, request, jobId, format = None):
-        response, job = verify_token(jobId, request)
-        if response["statusCode"] == 200:
-            job = Job.objects.get(jobId = jobId)
-            serializer = JobSerializer(job, data = request.data)
-            serializer.save()
-            return Response(serializer.data) 
         
 class RecommenderView(APIView, PageNumberPagination):
     permission_classes = (permissions.IsAuthenticated,)
@@ -240,4 +194,26 @@ class Search(generics.ListAPIView, PageNumberPagination):
                      'qualification', 
                      'responsibility', 
                      'jobTitle', 
-                     'jobCategory']     
+                     'jobCategory']  
+class LoginView(APIView):
+    def generate_token(self, email, userId):
+        exp_time = datetime.utcnow() + datetime.timedelta(days=1)
+        payload = {
+            'userId':userId,
+            'email':email
+        }
+        token = jwt.encode(payload, key = settings.SECRET_KEY, algorithm='HS256')
+        return token  
+
+    def post(self, request):
+        email = request.email
+        password = request.password
+        user = authenticate(email = email, password = password)
+        token = self.generate_token(user.userId, user.email)
+        if user:
+            return Response({"access":token, "statusCode":200}) 
+        return Response({"message":"User not found", "statusCode":404})
+    
+        
+        
+    

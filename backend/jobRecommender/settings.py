@@ -63,6 +63,7 @@ REST_FRAMEWORK = {
 }
 
 AUTHENTICATION_BACKENDS = [
+    'recommender.custom_backend.CustomBackend',
     'django.contrib.auth.backends.ModelBackend',
     'social_core.backends.google.GoogleOAuth2',
     'allauth.account.auth_backends.AuthenticationBackend'

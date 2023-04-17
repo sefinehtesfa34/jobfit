@@ -55,7 +55,9 @@ class Job(models.Model):
     preferredQualification = models.TextField(max_length = 500, blank = True)
     jobCategory = models.CharField(max_length = 100, blank=True)
     description = models.TextField(max_length = 10000, default = 'no description')
+    link = models.URLField(default="", max_length=2000, blank=True)
     timestamp = models.DateField(default=date.today())
+    
     
 class Skill(models.Model):
     skillId = models.UUIDField(max_length = 120, default = uuid.uuid4 ,primary_key = True)
